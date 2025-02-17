@@ -1,3 +1,6 @@
+import re
+
+
 def _fix_fracs(string):
     substrs = string.split("\\frac")
     new_str = substrs[0]
@@ -71,6 +74,12 @@ def _fix_sqrt(string):
 
 
 def _strip_string(string):
+    # extract the answer
+    # match = re.search(r'\\boxed{(.*?)}', string)  # Find \boxed{...} anywhere
+    # string = match.group(1) if match else string  # Extract only the boxed part
+    
+    string = re.split(r'\$', string, maxsplit=1)[0]  # Split at the first '$' and take the first part
+    
     # linebreaks  
     string = string.replace("\n", "")
     #print(string)

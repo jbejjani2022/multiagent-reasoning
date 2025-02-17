@@ -1,4 +1,6 @@
 datasets/
+slurm/
+outputs/
 
 # downloaded models
 models/

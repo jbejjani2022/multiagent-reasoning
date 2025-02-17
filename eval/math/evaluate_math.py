@@ -9,37 +9,25 @@ from math_equivalence import is_equiv
 
 def call_model(train_prompt, problem, model):
     '''
-    Given a problem, returns the most likely answer determined by the GPT engine 
+    Given a problem, returns answer determined by the model
     '''
     test_question = "\n" + problem + "\n" + "Answer: $"
     prompt = train_prompt + test_question
     # print(len(prompt))
     num_tokens = 20
     
-    c = client.chat.completions.create(
+    c = client.completions.create(
         model=f"deepseek-ai/{model}",
-        messages=[
-            {"role": "user", "content": prompt}
-        ],
+        prompt=prompt,
         max_tokens=num_tokens,
-        logprobs=100,
-        temperature=0, # 0.6
-        echo=True
+        # logprobs=100,
+        temperature=0.6,
+        # echo=True
     )
     
-    tokens = c["choices"][0]["logprobs"]["tokens"]
-    startindex = -1 * num_tokens
-    endindex = -1 * num_tokens + 1
-    for token in tokens[startindex + 1:]:
-        if token == "$" or token == "###" or token == "\n":
-            break
-        else:
-            endindex += 1
-    final_answer = ""
-    for i in range(startindex, endindex):
-        all_answers = c["choices"][0]["logprobs"]["top_logprobs"][i]
-        best_answer = max(all_answers.items(), key=operator.itemgetter(1))[0]
-        final_answer += best_answer
+    # Extract the answer directly from the model's completion
+    final_answer = c.choices[0].text.strip()
+
     return final_answer
 
 
@@ -53,7 +41,7 @@ def remove_boxed(s):
         return None
 
 
-train_prompt = "Given a mathematics problem, determine the answer. Simplify your answer as much as possible." + "\n" + "Problem: What is $\left(\\frac{7}{8}\\right)^3 \cdot \left(\\frac{7}{8}\\right)^{-3}$?" + "\n" + "Answer: $1$"
+train_prompt = "Given a mathematics problem, determine the answer. Please reason step by step and simplify your answer as much as possible." + "\n" + "Problem: What is $\left(\\frac{7}{8}\\right)^3 \cdot \left(\\frac{7}{8}\\right)^{-3}$?" + "\n" + "Answer: $1$"
 train_prompt += "\n" + "###" + "\n" + "Problem: In how many ways can 4 books be selected from a shelf of 6 books if the order in which the books are selected does not matter?" + "\n" +"Answer: $15$"
 train_prompt += "\n" +"###" + "\n" + "Problem: Find the distance between the points $(2,1,-4)$ and $(5,8,-3).$" + "\n" + "Answer: $\sqrt{59}$"
 train_prompt += "\n" + "###" + "\n" + "Problem: The faces of an octahedral die are labeled with digits $1$ through $8$. What is the probability, expressed as a common fraction, of rolling a sum of $15$ with a pair of such octahedral dice?" + "\n" + "Answer: $\\frac{1}{32}$"
@@ -62,7 +50,7 @@ train_prompt += "\n" + "###" + "\n" + "Problem: Calculate $6 \\cdot 8\\frac{1}{3
 train_prompt += "\n" + "###" + "\n" + "Problem: When the binary number $100101110010_2$ is divided by 4, what is the remainder (give your answer in base 10)?" + "\n" + "Answer: $2$"
 train_prompt += "\n" + "###" + "\n" + "Problem: How many zeros are at the end of the product 25 $\\times$ 240?" + "\n" + "Answer: $3$" + "\n" + "###"
 
-data_rootdir = "../datasets/MATH/test"
+data_rootdir = "/n/holylabs/LABS/sham_lab/Users/jbejjani/multiagent-reasoning/datasets/MATH/test"
 models_rootdir = "/n/holylabs/LABS/sham_lab/Users/jbejjani/DeepSeek-V3/models/"
 
 
@@ -81,6 +69,8 @@ def run(model="DeepSeek-R1-Distill-Qwen-1.5B", max=-1):
     total = 0
     for subdir, dirs, files in os.walk(data_rootdir):
         for file in files:
+            if not file.endswith(".json"):
+                continue
             fnames_list.append(os.path.join(subdir, file))
             with open(os.path.join(subdir, file), 'r') as fp:
                 try:
@@ -109,7 +99,7 @@ def run(model="DeepSeek-R1-Distill-Qwen-1.5B", max=-1):
                 print("--------------------------------------------")
 
                 try:
-                    equiv = is_equiv(model_output, answer)
+                    equiv = is_equiv(model_output, answer, verbose=True)
                 except:
                     equiv = False
                 if (prob_level, prob_type) in cors:
@@ -178,16 +168,27 @@ def run(model="DeepSeek-R1-Distill-Qwen-1.5B", max=-1):
 
 if __name__ == "__main__":
     """
+        salloc --partition=kempner_requeue --account=kempner_sham_lab --ntasks=1 --cpus-per-task=16 --mem=64G --gres=gpu:nvidia_h100_80gb_hbm3:1 --time=00-01:00:00
+
         Serve model with sglang:
         python -m sglang.launch_server --model /n/holylabs/LABS/sham_lab/Users/jbejjani/DeepSeek-V3/models/DeepSeek-R1-Distill-Qwen-1.5B --trust-remote-code --tp 1
+        
+        Takes ~5 min
     """
     
     model = "DeepSeek-R1-Distill-Qwen-1.5B"  # "DeepSeek-R1-Distill-Qwen-32B"
     # where the model is served (e.g. via sglang)
     base_url = "http://127.0.0.1:30000/v1"
     client = openai.Client(base_url=base_url, api_key="None")
+    
+    import time
+    
+    start_time = time.time()
 
     run(model)
 
     # for testing:
     # run(model, max=10)
+    
+    end_time = time.time()
+    print(f"Elapsed time: {end_time - start_time:.6f}s")

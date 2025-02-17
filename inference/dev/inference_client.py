@@ -2,6 +2,9 @@
     Request an interactive session with one A100 80GB GPU:
     salloc --partition=gpu_requeue --ntasks=1 --cpus-per-task=16 --mem=64G --gres=gpu:nvidia_a100-sxm4-80gb:1 --time=00-01:00:00
     
+    salloc --partition=kempner_requeue --ntasks=1 --cpus-per-task=16 --mem=64G --gres=gpu:nvidia_a100-sxm4-80gb:1 --time=00-01:00:00
+    salloc --partition=kempner_requeue --account=kempner_sham_lab --ntasks=1 --cpus-per-task=16 --mem=64G --gres=gpu:nvidia_h100_80gb_hbm3:1 --time=00-01:00:00
+    
     Or two A100 40GB GPUs:
     salloc --partition=gpu_requeue --ntasks=1 --cpus-per-task=16 --mem=64G --gres=gpu:nvidia_a100-sxm4-40gb:2 --time=00-01:00:00
 
