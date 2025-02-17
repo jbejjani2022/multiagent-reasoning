@@ -31,7 +31,7 @@
 import openai
 
 
-base_url="http://127.0.0.1:30000/v1"
+base_url = "http://127.0.0.1:30000/v1"
 model_name = "deepseek-ai/DeepSeek-R1-Distill-Qwen-32B"
 
 client = openai.Client(base_url=base_url, api_key="None")
