@@ -1,0 +1,5 @@
+currently not supported by transformer b/c of quantization issue?
+transformer library does not yet support the quantization method that deepseek uses
+https://stackoverflow.com/questions/79424312/deepseek-huggingface-model-loading-issue
+
+https://www.youtube.com/watch?v=ZqoZDI0p1aI

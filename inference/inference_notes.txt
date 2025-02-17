@@ -1,0 +1,50 @@
+sglang inference
+- https://github.com/sgl-project/sglang/tree/main/benchmark/deepseek_v3
+
+start service with vLLM
+
+pip install vllm
+
+vllm serve deepseek-ai/DeepSeek-R1-Distill-Qwen-32B --tensor-parallel-size 2 --max-model-len 32768 --enforce-eager --download-dir /n/holylabs/LABS/sham_lab/Users/jbejjani/DeepSeek-V3/models
+
+
+curl http://localhost:8000/v1/models
+
+curl http://localhost:8000/v1/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "deepseek-ai/DeepSeek-R1-Distill-Qwen-32B",
+    "prompt": "What is the capital of France?",
+    "max_tokens": 50
+  }'
+
+alternatively, use openai API 
+- https://docs.vllm.ai/en/latest/getting_started/quickstart.html#quickstart-online
+
+
+start a service using SGLang
+
+pip install --upgrade pip
+pip install sgl-kernel --force-reinstall --no-deps
+pip install "sglang[all]>=0.4.2.post4" --find-links https://flashinfer.ai/whl/cu124/torch2.5/flashinfer/
+
+huggingface-cli download deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B --local-dir /n/holylabs/LABS/sham_lab/Users/jbejjani/DeepSeek-V3/models/DeepSeek-R1-Distill-Qwen-1.5B
+huggingface-cli download deepseek-ai/DeepSeek-R1-Distill-Qwen-32B --local-dir /n/holylabs/LABS/sham_lab/Users/jbejjani/DeepSeek-V3/models/DeepSeek-R1-Distill-Qwen-32B
+
+^the above downloads the bf16 versions of the deepseek models (which are originall fp8)
+- since the bf16 versions are what's hosted on huggingface
+- the bf16 versions are required in order to serve on A100 GPUs
+
+python3 -m sglang.launch_server --model /n/holylabs/LABS/sham_lab/Users/jbejjani/DeepSeek-V3/models/DeepSeek-R1-Distill-Qwen-1.5B --trust-remote-code --tp 2
+
+
+
+R1 Usage Recommendations
+
+We recommend adhering to the following configurations when utilizing the DeepSeek-R1 series models, including benchmarking, to achieve the expected performance:
+
+Set the temperature within the range of 0.5-0.7 (0.6 is recommended) to prevent endless repetitions or incoherent outputs.
+Avoid adding a system prompt; all instructions should be contained within the user prompt.
+For mathematical problems, it is advisable to include a directive in your prompt such as: "Please reason step by step, and put your final answer within \boxed{}."
+When evaluating model performance, it is recommended to conduct multiple tests and average the results.
+Additionally, we have observed that the DeepSeek-R1 series models tend to bypass thinking pattern (i.e., outputting "<think>\n\n</think>") when responding to certain queries, which can adversely affect the model's performance. To ensure that the model engages in thorough reasoning, we recommend enforcing the model to initiate its response with "<think>\n" at the beginning of every output.
