@@ -129,7 +129,7 @@ def run(model, max=-1):
         if max > 0 and total > max:
             break
 
-    with open(f"outputs_answers_{model}.txt", "w+") as f:
+    with open(f"vllm_outputs_answers_{model}.txt", "w+") as f:
         for k, (output, answer, prob_type, prob_level, fname) in enumerate(zip(outputs, answers, types, levels, fnames_list)):
             f.write("{} TYPE: {} | LEVEL: {} | OUTPUT: {} | ANSWER: {} | FNAME: {}\n".format(k, prob_type, prob_level, output, answer, fname))
 
@@ -172,25 +172,25 @@ if __name__ == "__main__":
     """
         salloc --partition=kempner_requeue --account=kempner_sham_lab --ntasks=1 --cpus-per-task=16 --mem=64G --gres=gpu:nvidia_h100_80gb_hbm3:1 --time=00-01:00:00
 
-        Serve model with sglang:
-        python -m sglang.launch_server --model /n/holylabs/LABS/sham_lab/Users/jbejjani/DeepSeek-V3/models/DeepSeek-R1-Distill-Qwen-1.5B --trust-remote-code --tp 1
+        Serve model with vllm:
+        vllm serve deepseek-ai/DeepSeek-R1-Distill-Qwen-32B --tensor-parallel-size 1 --max-model-len 15360 --enforce-eager --download-dir /n/holylabs/LABS/sham_lab/Users/jbejjani/DeepSeek-V3/models
         
         Takes ~5 min to start serving
     """
     
-    model = "DeepSeek-R1-Distill-Qwen-32B"  # "DeepSeek-R1-Distill-Qwen-1.5B"
-    model_path = "/n/holylabs/LABS/sham_lab/Users/jbejjani/DeepSeek-V3/models/DeepSeek-R1-Distill-Qwen-32B"
-    
+    model = "DeepSeek-R1-Distill-Qwen-32B"
+    model_path = "/n/holylabs/LABS/sham_lab/Users/jbejjani/DeepSeek-V3/models"
+
     server_process = execute_shell_command(
         f"""
-        python -m sglang.launch_server --model {model_path} --trust-remote-code --tp 1
-        """
+    vllm serve deepseek-ai/{model} --tensor-parallel-size 1 \
+    --max-model-len 15360 --enforce-eager --download-dir {model_path}
+    """
     )
 
-    wait_for_server("http://127.0.0.1:30000")
-    
-    base_url = "http://127.0.0.1:30000/v1"  # where the model is served
-    client = openai.Client(base_url=base_url, api_key="None")
+    wait_for_server("http://127.0.0.1:8000")
+
+    client = openai.Client(base_url="http://127.0.0.1:8000/v1", api_key="None")
     
     start_time = time.time()
     run(model)
@@ -200,6 +200,6 @@ if __name__ == "__main__":
     
     end_time = time.time()
     
-    with open(f"outputs_answers_{model}.txt", "a") as f:
+    with open(f"vllm_outputs_answers_{model}.txt", "a") as f:
         print(f"Elapsed time: {end_time - start_time:.6f}s")
         f.write(f"Elapsed time: {end_time - start_time:.6f}s\n")

@@ -1,6 +1,7 @@
-datasets/
+data/
 slurm/
-outputs/
+outputs_test/
+out/
 
 # downloaded models
 models/
