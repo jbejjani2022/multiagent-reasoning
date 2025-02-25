@@ -31,7 +31,7 @@ pip install "sglang[all]>=0.4.2.post4" --find-links https://flashinfer.ai/whl/cu
 huggingface-cli download deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B --local-dir /n/holylabs/LABS/sham_lab/Users/jbejjani/DeepSeek-V3/models/DeepSeek-R1-Distill-Qwen-1.5B
 huggingface-cli download deepseek-ai/DeepSeek-R1-Distill-Qwen-32B --local-dir /n/holylabs/LABS/sham_lab/Users/jbejjani/DeepSeek-V3/models/DeepSeek-R1-Distill-Qwen-32B
 
-^the above downloads the bf16 versions of the deepseek models (which are originall fp8)
+^the above downloads the bf16 versions of the deepseek models (which are originally fp8)
 - since the bf16 versions are what's hosted on huggingface
 - the bf16 versions are required in order to serve on A100 GPUs
 

@@ -113,10 +113,12 @@ def infer(args):
         args.end_idx = len(examples)
     examples = examples[args.start_idx:args.end_idx]
     
+    available_gpus = os.environ['CUDA_VISIBLE_DEVICES'].split(',')
+    
     dt_string = datetime.now().strftime("%m-%d_%H-%M")
     model_name = "/".join(args.model_name_or_path.split("/")[-3:])
     out_file_prefix = f'{args.split}_{args.prompt_type}_t{args.temperature}'
-    out_file = f'{args.output_dir}/{model_name}/{args.data_name}/{out_file_prefix}_k{args.n_sampling}_s{args.start_idx}_e{args.end_idx}.jsonl'
+    out_file = f'{args.output_dir}/{model_name}/{args.data_name}/{out_file_prefix}_k{args.n_sampling}_s{args.start_idx}_e{args.end_idx}_max{args.max_tokens}_tp{len(available_gpus)}.jsonl'
     
     
     if os.path.exists(out_file):
@@ -125,7 +127,6 @@ def infer(args):
     os.makedirs(f'{args.output_dir}/{model_name}/{args.data_name}', exist_ok=True)
     os.makedirs(f'{args.completions_save_dir}/{model_name}/{args.data_name}', exist_ok=True)
     
-    available_gpus = os.environ['CUDA_VISIBLE_DEVICES'].split(',')
     if len(available_gpus) == 1:
         envs.VLLM_HOST_IP="0.0.0.0" or "127.0.0.1"
     print(f"available_gpus: {available_gpus}")
@@ -152,9 +153,10 @@ def infer(args):
     llm = LLM(model=model_name_or_path, 
               tensor_parallel_size=len(available_gpus), 
               trust_remote_code=True, 
-            #   swap_space=60,
+              # swap_space=60,
               gpu_memory_utilization=0.96,
-              )
+              # max_model_len=15360  # restrict model's max seq len to be the capacity of the KV cache
+            )
     
     file_outputs = []
     correct_cnt = 0
@@ -238,6 +240,11 @@ def infer(args):
 
 
 if __name__ == "__main__":
+    start_time = time.time()
     args = parse_args()
     set_seed(args.seed)
+
     infer(args)
+    
+    end_time = time.time()
+    print(f"Elapsed time: {end_time - start_time:.6f}s")
