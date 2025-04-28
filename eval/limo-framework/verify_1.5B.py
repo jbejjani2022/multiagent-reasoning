@@ -4,6 +4,7 @@ from vllm import LLM, SamplingParams
 import re
 import importlib.util
 import os
+from pathlib import Path
 import argparse
 import vllm.envs as envs
 import random
@@ -32,9 +33,7 @@ def parse_args():
     parser.add_argument('--model_name_or_path', type=str, default="./", help="model dir")
     parser.add_argument('--n_sampling', type=int, default=1, help="n for sampling")
     parser.add_argument("--k", type=int, default=1, help="Value of k for pass@k calculation")
-    parser.add_argument("--data_dir", default="./data", type=str)
-    parser.add_argument('--data_name', type=str, default="math", help='identify how to extract answer')
-    parser.add_argument("--split", default="test", type=str)
+    parser.add_argument('--data_path', type=str, help='identify the data path')
     parser.add_argument('--start_idx', type=int, default=0, help="data[start:end]")
     parser.add_argument('--end_idx', type=int, default=-1, help="data[start:end], if -1, data[start:]")
     parser.add_argument("--temperature", default=0, type=float)
@@ -43,7 +42,7 @@ def parse_args():
     parser.add_argument("--prompt_file_path", default="./prompts", type=str)
     parser.add_argument("--surround_with_messages", action="store_true")
     parser.add_argument("--use_few_shot", action="store_true")
-    parser.add_argument("--output_dir", default="./outputs", type=str)
+    parser.add_argument("--output_dir", default="./outputs/verification", type=str)
     parser.add_argument('--stop', type=parse_list)
     parser.add_argument("--top_p", default=1, type=float)
     parser.add_argument("--seed", default=0, type=int)
@@ -64,8 +63,8 @@ def get_conversation_prompt_by_messages(tokenizer, messages):
     )
     return text
 
-def get_three_prompt(prompt_type, data_name):
-    file_path = os.path.join(".", "prompts", prompt_type, f"{data_name}.py")
+def get_three_prompt(prompt_type, prompt_name="verify.py"):
+    file_path = os.path.join(".", "prompts", prompt_type, prompt_name)
     if not os.path.exists(file_path):
         raise FileNotFoundError(f"File not found: {file_path}")
     # 动态导入模块
@@ -91,6 +90,11 @@ def get_three_prompt(prompt_type, data_name):
     return system_prompt, few_shot_prompt, question_format
 
 
+def extract_verification_answer(text):
+    match = re.search(r'verification answer[:*\s]*\s*(true|false)', text, re.IGNORECASE)
+    return match.group(1).lower() == 'true' if match else None  # Returns True, False, or None if not found
+
+
 def infer(args):
     model_name_or_path = args.model_name_or_path
     print(f"current eval model: {model_name_or_path}")
@@ -108,7 +112,16 @@ def infer(args):
                                      top_p=args.top_p,
                                      )
     
-    examples = load_data(args.data_name, args.split, args.data_dir)
+    # load data
+    examples = list(load_jsonl(args.data_path))
+    
+    # add 'idx' in the first column
+    if 'idx' not in examples[0]:
+        examples = [{'idx': i, **example} for i, example in enumerate(examples)]
+
+    # dedepulicate & sort
+    examples = sorted(examples, key=lambda x: x['idx'])
+    
     if args.end_idx == -1:
         args.end_idx = len(examples)
     examples = examples[args.start_idx:args.end_idx]
@@ -116,16 +129,17 @@ def infer(args):
     available_gpus = os.environ['CUDA_VISIBLE_DEVICES'].split(',')
     
     dt_string = datetime.now().strftime("%m-%d_%H-%M")
+    data_path = Path(args.data_path)
+    data_name = data_path.stem
     model_name = "/".join(args.model_name_or_path.split("/")[-3:])
-    out_file_prefix = f'{args.split}_{args.prompt_type}_t{args.temperature}'
-    out_file = f'{args.output_dir}/{model_name}/{args.data_name}/{out_file_prefix}_pass@{args.k}_k{args.n_sampling}_s{args.start_idx}_e{args.end_idx}_max{args.max_tokens}_tp{len(available_gpus)}.jsonl'
-    
+    out_file_prefix = f'{args.prompt_type}_t{args.temperature}'
+    out_file = f'{args.output_dir}/{model_name}/{data_name}/{out_file_prefix}_k{args.n_sampling}_s{args.start_idx}_e{args.end_idx}_max{args.max_tokens}_tp{len(available_gpus)}.jsonl'
     
     if os.path.exists(out_file):
         print(f"Completely same name file({out_file}) exist, skip generation, save file and check correct")
         return
-    os.makedirs(f'{args.output_dir}/{model_name}/{args.data_name}', exist_ok=True)
-    os.makedirs(f'{args.completions_save_dir}/{model_name}/{args.data_name}', exist_ok=True)
+    os.makedirs(f'{args.output_dir}/{model_name}/{data_name}', exist_ok=True)
+    os.makedirs(f'{args.completions_save_dir}/{model_name}/{data_name}', exist_ok=True)
     
     if len(available_gpus) == 1:
         envs.VLLM_HOST_IP="0.0.0.0" or "127.0.0.1"
@@ -134,8 +148,16 @@ def infer(args):
     prompt_batch = []
     for example in tqdm(examples, total=len(examples)):
         # parse question and answer
-        question = parse_question(example, args.data_name)
-        system_prompt, few_shot_prompt, question_format = get_three_prompt(args.prompt_type, args.data_name)
+        question = example.get("question", "")
+        generated_responses = example.get("generated_responses", "")
+        if generated_responses:
+            proposed_solution = generated_responses[0]
+        
+        question = f"QUESTION: {question}\nPROPOSED SOLUTION: {proposed_solution}\n"
+        instructions = "INSTRUCTIONS: Go over the proposed solution to the question and check whether it is mathematically correct. If you reach a step that is incorrect, stop and reply 'FINAL VERIFICATION ANSWER: False'. If each step is correct, reply 'FINAL VERIFICATION ANSWER: True'. Your response must end in either 'FINAL VERIFICATION ANSWER: False' or 'FINAL VERIFICATION ANSWER: True'."
+        question += instructions
+        
+        system_prompt, few_shot_prompt, question_format = get_three_prompt(args.prompt_type)
         
         if args.use_few_shot:
             cur_prompt = few_shot_prompt + question_format.format(question=question)
@@ -160,15 +182,26 @@ def infer(args):
     
     file_outputs = []
     correct_cnt = 0
+    true_positives = 0
+    true_negatives = 0
+    false_positives = 0
+    false_negatives = 0
     for cur_generation_epoch in range(generation_epoch):
-        completions_save_file = f'{args.completions_save_dir}/{model_name}/{args.data_name}/{out_file_prefix}_pass@{args.k}_k{args.n_sampling}_s{args.start_idx}_e{args.end_idx}_gen_round{cur_generation_epoch}.pkl'
+        completions_save_file = f'{args.completions_save_dir}/{model_name}/{data_name}/{out_file_prefix}_k{args.n_sampling}_s{args.start_idx}_e{args.end_idx}_gen_round{cur_generation_epoch}.pkl'
         
         completions = llm.generate(prompt_batch, sampling_params)
         
         save_completions(completions, completions_save_file)
         for i in range(len(examples)):
             d = examples[i]
-            question = parse_question(d, args.data_name)
+            question = example.get("question", "")
+            generated_responses = example.get("generated_responses", "")
+            if generated_responses:
+                proposed_solution = generated_responses[0]
+            
+            question = f"QUESTION: {question}\nPROPOSED SOLUTION: {proposed_solution}\n"
+            question += instructions
+            
             generated_responses = [completions[i].outputs[j].text for j in range(len(completions[i].outputs))]
             if cur_generation_epoch == 0:
                 file_outputs.append({
@@ -187,13 +220,14 @@ def infer(args):
     pass_at_k_list = []
     k = args.k
     
-
+    # check verifier correctness - whether verifier's judgments match the correctness of the proposed solutions
     for i in tqdm(range(len(examples)), "check correct..."):
         d = examples[i]
-        gt_cot, gt_ans = parse_ground_truth(d, args.data_name)
+        gt_ans = d.get("is_correct", "")  # ground truth answer is true or false - whether the original proposed solution was correct
+        
         generated_responses = file_outputs[i]['generated_responses']
-        generated_answers = [extract_answer(generated_response, args.data_name) for generated_response in generated_responses]
-        is_correct_list = [check_is_correct(generated_answer, gt_ans) for generated_answer in generated_answers]
+        generated_answers = [extract_verification_answer(generated_response) for generated_response in generated_responses]
+        is_correct_list = [generated_answer == gt_ans for generated_answer in generated_answers]
         is_correct = any(is_correct_list)
         if is_correct:
             correct_cnt += 1
@@ -213,10 +247,19 @@ def infer(args):
                 pass_at_k_list.append(pass_at_k)
             else:
                 pass_at_k_list.append(0)
+        else:
+            if generated_answers[0] == True:
+                if gt_ans == True:
+                    true_positives += 1
+                else:
+                    false_positives += 1
+            else:
+                if gt_ans == True:
+                    false_negatives += 1
+                else:
+                    true_negatives += 1
                 
-
-            
-    
+                
     temp_out_file = out_file + ".tmp"
     with open(temp_out_file, 'w', encoding='utf-8') as f:
         count = 0
@@ -229,12 +272,16 @@ def infer(args):
         f.flush()
     os.rename(temp_out_file, out_file)
     
-    print(f"correct cnt / total cnt: {correct_cnt}/{len(examples)}")
-    print(f"Acc: {correct_cnt / len(examples):.4f}")
+    print(f"Acc of generator: {true_positives + false_negatives}/{len(examples)} = {(true_positives + false_negatives) / len(examples):.4f}")
+    print(f"Acc of verifier: {correct_cnt}/{len(examples)} = {correct_cnt / len(examples):.4f}")
+    print(f"true positives: {true_positives}")
+    print(f"true negatives: {true_negatives}")
+    print(f"false positives: {false_positives}")
+    print(f"false negatives: {false_negatives}")
 
     if pass_at_k_list:
         average_pass_at_k = sum(pass_at_k_list) / len(pass_at_k_list)
-        print(f"Pass@{k}: {sum(pass_at_k_list)}/{len(pass_at_k_list)} = {average_pass_at_k:.4f}")  # estimates the probability of getting at least one correct answer if you sample k times
+        print(f"Pass@{k}: {sum(pass_at_k_list)}/{len(pass_at_k_list)} = {average_pass_at_k:.4f}")
     else:
         print(f"Pass@1: {correct_cnt}/{len(examples)} = {correct_cnt / len(examples):.4f}")
 

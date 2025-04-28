@@ -1,0 +1,48 @@
+# these hyperparameter changes were suggested by perplexity
+
+### model
+model_name_or_path: /n/holylabs/LABS/sham_lab/Users/jbejjani/DeepSeek-V3/models/DeepSeek-R1-Distill-Qwen-1.5B
+trust_remote_code: true
+
+### method
+stage: sft
+do_train: true
+finetuning_type: lora
+lora_rank: 16 # increased from 8
+lora_target: all
+
+### dataset
+dataset: 1.5B_pass@5_correct_math500_solutions
+template: deepseek3
+cutoff_len: 32768  # 4096  # 2048
+max_samples: 3000  # increased from 1000
+overwrite_cache: true
+preprocessing_num_workers: 16
+
+### output
+output_dir: saves/deepseek-r1-1.5b/1.5B_pass@5_correct_math500_solutions/lora/sft/3ep/new_hyperparams/cosine
+logging_steps: 10
+save_steps: 500
+plot_loss: true
+overwrite_output_dir: true
+
+### train
+per_device_train_batch_size: 1  # changed from 1
+gradient_accumulation_steps: 8   # changed from 8
+learning_rate: 3.0e-5  # decreased from 1.0e-4
+num_train_epochs: 3.0  # increased from 1
+lr_scheduler_type: cosine  # changed from cosine
+warmup_ratio: 0.05  # decreased from 0.1
+bf16: true
+ddp_timeout: 180000000
+
+### wandb logging
+report_to: wandb
+run_name: cosine_new_hyperparams_1.5B_lora_sft_1.5B_pass@5_correct_math500_solutions_3ep
+
+### eval
+# eval_dataset: alpaca_en_demo
+# val_size: 0.1
+# per_device_eval_batch_size: 1
+# eval_strategy: steps
+# eval_steps: 500

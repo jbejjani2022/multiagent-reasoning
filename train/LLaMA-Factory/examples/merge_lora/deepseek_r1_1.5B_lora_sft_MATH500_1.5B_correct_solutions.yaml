@@ -1,0 +1,14 @@
+# Usage:
+# llamafactory-cli export examples/merge_lora/deepseek_r1_32B_lora_sft_MATH500_32B_correct_solutions.yaml
+
+### model
+model_name_or_path: /n/holylabs/LABS/sham_lab/Users/jbejjani/DeepSeek-V3/models/DeepSeek-R1-Distill-Qwen-1.5B
+adapter_name_or_path: saves/deepseek-r1-1.5b/1.5B_pass@5_correct_math500_solutions/lora/sft/3ep/new_hyperparams/cosine
+template: deepseek3
+trust_remote_code: true
+
+### export
+export_dir: /n/netscratch/sham_lab/Everyone/jbejjani/output/deepseek_r1_1.5B_lora_sft/maxcutoff_32768/1.5B_pass@5_correct_math500_solutions/3ep/new_hyperparams/cosine
+export_size: 5
+export_device: cpu
+export_legacy_format: false
