@@ -2,12 +2,12 @@
 
 ### model
 model_name_or_path: /n/holylabs/LABS/sham_lab/Users/jbejjani/Llama3/models/Meta-Llama-3-8B-Instruct
-adapter_name_or_path: /n/netscratch/sham_lab/Everyone/jbejjani/saves/llama3-8b/lora/sft/math500_llama8B_correct_solutions
+adapter_name_or_path: /n/netscratch/sham_lab/Everyone/jbejjani/saves/llama3-8b/lora/kto/llama8B_math500_solutions_kto
 template: llama3
 trust_remote_code: true
 
 ### export
-export_dir: /n/netscratch/sham_lab/Everyone/jbejjani/output/llama3_lora_sft/math500_llama8B_correct_solutions
+export_dir: /n/netscratch/sham_lab/Everyone/jbejjani/output/llama3_lora_kto/llama8B_math500_solutions_kto
 export_size: 5
 export_device: cpu
 export_legacy_format: false
