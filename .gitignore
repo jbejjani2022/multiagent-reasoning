@@ -1,3 +1,6 @@
+*.sif
+dev/
+
 data/
 slurm/
 outputs_test/
