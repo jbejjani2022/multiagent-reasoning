@@ -1,7 +1,7 @@
 CUDA_VISIBLE_DEVICES='0,1' \
 python eval.py \
---model_name_or_path "/n/netscratch/sham_lab/Everyone/jbejjani/output/deepseek_r1_1.5B_lora_kto/maxcutoff_16384/1.5B_math500_pass@5_solutions/3ep" \
---data_name "aime" \
+--model_name_or_path '/n/netscratch/sham_lab/Everyone/jbejjani/verl/checkpoints/verl_ppo/1.5B_math500_ppo/global_step_620/actor/hf_model' \
+--data_name "math" \
 --prompt_type "qwen-instruct" \
 --temperature 0.6 \
 --start_idx 0 \
